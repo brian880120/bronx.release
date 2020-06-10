@@ -165,7 +165,8 @@ func (rb *ReleaseBuilder) getReleaseNote() {
 		}
 	}
 
-	releaseNotes := fmt.Sprintf("https://gitlab.lblw.ca/grocery/bronx/pipelines/%d\n\n```\nbronxFeAppVersion: \"%s\"\nbronxFEAppV2Path: \"true\"\n```\n\n%s\n", rb.pipelineId, rb.releaseVersion, sb.String())
+	releaseNotes :=
+		fmt.Sprintf("https://gitlab.lblw.ca/grocery/bronx/pipelines/%d\n\n```\nbronxFEAppVersion: \"%s\"\nbronxFEAppV2Path: \"true\"\n```\n\n%s\n", rb.pipelineId, rb.releaseVersion, sb.String())
 	rb.releaseNote = releaseNotes
 }
 
