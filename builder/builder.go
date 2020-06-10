@@ -19,8 +19,9 @@ import (
 	"github.com/xanzy/go-gitlab"
 )
 
+// golang const convension
 const REGEX_TICKET_ID_PATTERN = "[\\[]?[a-zA-Z]*[-][0-9]*[\\]]?"
-const REGEX_TICKET_Id = "[a-zA-Z]*[-][0-9]*"
+const REGEX_TICKET_ID = "[a-zA-Z]*[-][0-9]*"
 
 type ReleaseBuilder struct {
 	git            *gitlab.Client
@@ -33,6 +34,7 @@ type ReleaseBuilder struct {
 
 // Initialize releaseBuilder
 func (rb *ReleaseBuilder) Initialize() {
+	// TODO: consider return empty string case
 	token := os.Getenv("GITLAB_TOKEN")
 
 	git, err := gitlab.NewClient(token, gitlab.WithBaseURL("https://gitlab.lblw.ca/api/v4"))
@@ -45,9 +47,7 @@ func (rb *ReleaseBuilder) Initialize() {
 }
 
 func (rb *ReleaseBuilder) Run() {
-	go func() {
-		rb.getReleaseNote()
-	}()
+	// zap or logrus
 	rb.startBranchProtect()
 	rb.prepareMaster()
 	rb.getPackageVersion()
@@ -57,12 +57,9 @@ func (rb *ReleaseBuilder) Run() {
 	// have wait process
 	rb.getJob()
 	rb.getArtifact()
+	rb.getReleaseNote()
 	rb.updateTag()
 	rb.endBranchProtect()
-
-	fmt.Println(rb.releaseVersion)
-	fmt.Println(rb.packageVersion)
-	fmt.Println(rb.pipelineId)
 	// TODO: delete bronx
 }
 
@@ -102,11 +99,16 @@ func (rb *ReleaseBuilder) getPackageVersion() {
 func (rb *ReleaseBuilder) createTag() {
 	time.Sleep(10 * time.Second)
 	fmt.Println("create release tag")
-	tagName := "test-" + rb.packageVersion
+	// TODO: change to release-vX.XX.X
+	// Change Ref branch to master
+	t := time.Now()
+	tagName := "test-v" + rb.packageVersion
+	message := fmt.Sprintf("Release v%s - %02d-%02d-%d@%02d:%02d", rb.packageVersion, t.Month(), t.Day(), t.Year(), t.Hour(), t.Minute())
+
 	opt := &gitlab.CreateTagOptions{
 		TagName:            gitlab.String(tagName),
 		Ref:                gitlab.String("test-master"),
-		Message:            gitlab.String("test message"),
+		Message:            gitlab.String(message),
 		ReleaseDescription: gitlab.String("test release"),
 	}
 
@@ -116,7 +118,8 @@ func (rb *ReleaseBuilder) createTag() {
 
 func (rb *ReleaseBuilder) updateTag() {
 	fmt.Println("update tag release note")
-	tagName := "test-" + rb.packageVersion
+	// TODO: change to release-vX.XX.X
+	tagName := "test-v" + rb.packageVersion
 	opt := &gitlab.UpdateReleaseNoteOptions{
 		Description: gitlab.String(rb.releaseNote),
 	}
@@ -130,7 +133,7 @@ func (rb *ReleaseBuilder) getReleaseNote() {
 	var ticketIdPattern, title, ticketId string
 	var labels []string
 	regexTicketIdPattern := regexp.MustCompile(REGEX_TICKET_ID_PATTERN)
-	regexTicketId := regexp.MustCompile(REGEX_TICKET_Id)
+	regexTicketId := regexp.MustCompile(REGEX_TICKET_ID)
 
 	sb := new(strings.Builder)
 
@@ -158,11 +161,12 @@ func (rb *ReleaseBuilder) getReleaseNote() {
 			ticketIdPattern = regexTicketIdPattern.FindString(mr.Title)
 			title = common.GetSubstringAfter(mr.Title, ticketIdPattern)
 			labels = mr.Labels
-			sb.WriteString(fmt.Sprintf("%s - %s - %s\n", ticketId, title, common.ParseLabel(labels)))
+			sb.WriteString(fmt.Sprintf("* %s - %s - %s\n", ticketId, title, common.ParseLabel(labels)))
 		}
 	}
 
-	rb.releaseNote = sb.String()
+	releaseNotes := fmt.Sprintf("https://gitlab.lblw.ca/grocery/bronx/pipelines/%d\n\n```\nbronxFeAppVersion: \"%s\"\nbronxFEAppV2Path: \"true\"\n```\n\n%s\n", rb.pipelineId, rb.releaseVersion, sb.String())
+	rb.releaseNote = releaseNotes
 }
 
 func (rb *ReleaseBuilder) startBranchProtect() {
@@ -205,7 +209,7 @@ func (rb *ReleaseBuilder) endBranchProtect() {
 func (rb *ReleaseBuilder) getPipeline() {
 	fmt.Println("getting pipeline Id")
 
-	refName := "test-" + rb.packageVersion
+	refName := "test-v" + rb.packageVersion
 	opt := &gitlab.ListProjectPipelinesOptions{
 		Ref:  gitlab.String(refName),
 		Name: gitlab.String("bo.dai"),
